@@ -21,7 +21,7 @@ namespace UvClient4CSharp
         public const string DllPath = "Common.dll";
 
         [DllImport(DllPath, EntryPoint = "CreateClient", CallingConvention = CallingConvention.StdCall)]
-        public extern static int CreateClient(QuoteCallBackDelegate call);
+        public extern static int CreateClient(ref byte ip, int port, QuoteCallBackDelegate call);
 
         [DllImport(DllPath, EntryPoint = "ReleaseClient", CallingConvention = CallingConvention.Cdecl)]
         public extern static int ReleaseClient(int clientId);

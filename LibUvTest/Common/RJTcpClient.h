@@ -5,9 +5,6 @@
 #include <thread>
 #include "LibUvHelper.h"
 
-#define DEFALUT_IP "127.0.0.1"
-#define DEFALUT_PORT 7000
-
 struct msg_param
 {
 	uv_write_t write;
@@ -38,7 +35,7 @@ public:
 	RJClientCallBack m_callback;
 
 public:
-	_EXPORT_ int Connect();
+	_EXPORT_ int Connect(const char* ip, int port);
 	_EXPORT_ void Send(const char* msg, int size);
 	_EXPORT_ void Close();
 

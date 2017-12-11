@@ -14,7 +14,8 @@ namespace UvClient4CSharp
         public void Init()
         {
             _delegate = new CppAdapter.QuoteCallBackDelegate(ClientCallBack);
-            _clientId = CppAdapter.CreateClient(_delegate);
+            byte[] bip = System.Text.Encoding.UTF8.GetBytes("127.0.0.1");
+            _clientId = CppAdapter.CreateClient(ref bip[0], 7000, _delegate);
         }
 
         public void Send(string msg)

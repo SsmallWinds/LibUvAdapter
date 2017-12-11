@@ -212,7 +212,7 @@ int main()
 	//printf("getchar\n");
 
 	RJTcpServer server;
-	server.Init();
+	server.Init(7000);
 	getchar();
 	return 0;
 }

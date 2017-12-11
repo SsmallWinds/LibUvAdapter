@@ -8,7 +8,6 @@
 
 using namespace std;
 
-#define DEFAULT_PORT 7000
 #define DEFAULT_IP "0.0.0.0"
 #define BACK_LOG 128
 
@@ -35,7 +34,7 @@ private:
 
 public:
 	_EXPORT_ void Close();
-	_EXPORT_ int Init();
+	_EXPORT_ int Init(int port);
 	_EXPORT_ void Send(uv_tcp_t* client, const char* msg, int size);
 	_EXPORT_ void Broadcast(const char* msg, int size);
 

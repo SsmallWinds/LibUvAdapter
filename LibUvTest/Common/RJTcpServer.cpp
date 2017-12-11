@@ -207,7 +207,7 @@ void RJTcpServer::Close()
 		uv_walk(m_pLoop, WalkCallBack, this);
 }
 
-int RJTcpServer::Init()
+int RJTcpServer::Init(int port)
 {
 	int iret;
 	sockaddr_in addr;
@@ -227,7 +227,7 @@ int RJTcpServer::Init()
 		cout << "Init->uv_listen:" << GetUVError(iret) << endl;
 		return -1;
 	}
-	iret = uv_ip4_addr(DEFAULT_IP, DEFAULT_PORT, &addr);
+	iret = uv_ip4_addr(DEFAULT_IP, port, &addr);
 	if (iret)
 	{
 		cout << "Init->uv_listen:" << GetUVError(iret) << endl;

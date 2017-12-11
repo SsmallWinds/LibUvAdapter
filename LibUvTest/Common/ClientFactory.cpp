@@ -32,7 +32,7 @@ void OnClientCallBack(int clientId, int type, const char* msg, int size)
 }
 
 ///返回值小于0时，创建失败；否则创建成功，需主动调用ReleaseClient释放资源
-_EXTERN_C_ int _stdcall CreateClient(ClientCallBack callback)
+_EXTERN_C_ int _stdcall CreateClient(char* ip, int port, ClientCallBack callback)
 {
 	g_index += 1;
 	int clientId = g_index;
@@ -41,7 +41,7 @@ _EXTERN_C_ int _stdcall CreateClient(ClientCallBack callback)
 	client->client.m_callback = OnClientCallBack;
 	client->callback = callback;
 
-	int result = client->client.Connect();
+	int result = client->client.Connect(ip, port);
 	if (result < 0)
 	{
 		delete client;

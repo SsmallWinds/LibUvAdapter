@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
 
 	////std::thread thread(std::bind(&RJTcpClient::Init, &client));
 
-	client->Connect();
+	client->Connect(DEFAULT_IP, DEFAULT_PORT);
 	//Sleep(1000);
 
 	std::string test;

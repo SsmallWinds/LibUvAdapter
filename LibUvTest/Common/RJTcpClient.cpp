@@ -38,7 +38,7 @@ RJTcpClient::~RJTcpClient()
 	std::cout << "release success!" << std::endl;
 }
 
-int RJTcpClient::Connect()
+int RJTcpClient::Connect(const char* ip, int port)
 {
 	m_loop = uv_default_loop();
 	int iret;
@@ -59,7 +59,7 @@ int RJTcpClient::Connect()
 	}
 
 	sockaddr_in addr;
-	iret = uv_ip4_addr(DEFALUT_IP, DEFALUT_PORT, &addr);
+	iret = uv_ip4_addr(ip, port, &addr);
 	if (iret)
 	{
 		cout << "Init -> uv_ip4_addr:" << GetUVError(iret) << endl;
