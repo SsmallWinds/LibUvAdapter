@@ -18,6 +18,10 @@ namespace UvClient4CSharp
 
             client.Send("Hello");
 
+            Thread.Sleep(1000);
+
+           client.Release();
+
             Console.ReadLine();
         }
     }

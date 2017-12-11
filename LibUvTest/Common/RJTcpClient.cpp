@@ -5,6 +5,9 @@ using namespace std;
 
 RJTcpClient::RJTcpClient()
 {
+	m_is_connected = false;
+	m_is_closing = false;
+	m_loop = nullptr;
 	m_reader.SetCallBack(std::bind(&RJTcpClient::OnMsg, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)
 		, &m_uv_client);
 }
@@ -12,18 +15,69 @@ RJTcpClient::RJTcpClient()
 
 RJTcpClient::~RJTcpClient()
 {
+	m_is_connected = false;
+
+	m_send_lock.lock();
+	while (!m_send_buf.empty())
+	{
+		delete m_send_buf.front().base;
+		m_send_buf.pop();
+	}
+	m_send_lock.unlock();
+
+	CloseAll();
+
 	if (m_p_thread)
+	{
+		m_p_thread->join();
 		delete m_p_thread;
+	}
+	std::cout << "release success!" << std::endl;
 }
 
-void RJTcpClient::Init()
+int RJTcpClient::Connect()
 {
+	m_loop = uv_default_loop();
+	int iret;
+
+	m_async_handle.data = this;
+	iret = uv_async_init(m_loop, &m_async_handle, AsyncCallBack);
+	if (iret)
+	{
+		cout << "Init -> uv_async_init:" << GetUVError(iret) << endl;
+		return -1;
+	}
+
+	iret = uv_tcp_init(m_loop, &m_uv_client);
+	if (iret)
+	{
+		cout << "Init -> uv_tcp_init:" << GetUVError(iret) << endl;
+		return -2;
+	}
+
+	sockaddr_in addr;
+	iret = uv_ip4_addr(DEFALUT_IP, DEFALUT_PORT, &addr);
+	if (iret)
+	{
+		cout << "Init -> uv_ip4_addr:" << GetUVError(iret) << endl;
+		return -3;
+	}
+
+	m_uv_client.data = this;
+	iret = uv_tcp_connect(&m_connect, &m_uv_client, (const struct sockaddr*)&addr, HandleConnection);
+	if (iret)
+	{
+		cout << "Init -> uv_tcp_connect:" << GetUVError(iret) << endl;
+		return -4;
+	}
+
 	m_p_thread = new std::thread(&RJTcpClient::RunThread, this);
+	return 0;
 }
 
 void RJTcpClient::Send(const char* msg, int size)
 {
-	if (size <= 0)return;
+	if (!m_is_connected || msg == nullptr || size <= 0)return;
 
 	char* buf = new char[size + PACKAGE_HEAD_SIZE];
 	Msg2Package(msg, size, buf);
@@ -40,6 +94,10 @@ void RJTcpClient::Send(const char* msg, int size)
 
 void RJTcpClient::Close()
 {
+	if (m_is_closing)
+		return;
+	m_is_closing = true;
+	m_is_connected = false;
 	uv_async_send(&m_async_handle);
 }
 
@@ -68,36 +126,13 @@ void RJTcpClient::OnError()
 
 void RJTcpClient::RunThread()
 {
-	m_loop = uv_default_loop();
-	int iret;
-
-	m_async_handle.data = this;
-	iret = uv_async_init(m_loop, &m_async_handle, AsyncCallBack);
-	if (iret)
-	{
-		cout << "Init -> uv_async_init:" << GetUVError(iret) << endl;
-		OnError();
-	}
-
-	iret = uv_tcp_init(m_loop, &m_uv_client);
-	if (iret)
-	{
-		cout << "Init -> uv_tcp_init:" << GetUVError(iret) << endl;
-		OnError();
-	}
-
-	sockaddr_in addr;
-	uv_ip4_addr(DEFALUT_IP, DEFALUT_PORT, &addr);
-
-	m_uv_client.data = this;
-	iret = uv_tcp_connect(&m_connect, &m_uv_client, (const struct sockaddr*)&addr, HandleConnection);
-	if (iret)
-	{
-		cout << "Init -> uv_tcp_connect:" << GetUVError(iret) << endl;
-		OnError();
-	}
-
 	uv_run(m_loop, UV_RUN_DEFAULT);
+}
+
+void RJTcpClient::CloseAll()
+{
+	if (m_loop)
+		uv_walk(m_loop, WalkCallBack, this);
 }
 
 void RJTcpClient::AllocBuffer(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf)
@@ -114,6 +149,7 @@ void RJTcpClient::HandleConnection(uv_connect_t* connect, int status)
 		((RJTcpClient*)connect->handle->data)->OnError();
 		return;
 	}
+	((RJTcpClient*)connect->handle->data)->m_is_connected = true;
 
 	int iret = uv_read_start(connect->handle, AllocBuffer, HandleMsg);
 	if (iret)
@@ -146,6 +182,13 @@ void RJTcpClient::HandleMsg(uv_stream_t* client, ssize_t nread, const uv_buf_t* 
 void RJTcpClient::AsyncCallBack(uv_async_t* handle)
 {
 	RJTcpClient* client = (RJTcpClient*)handle->data;
+
+	if (client->m_is_closing)
+	{
+		client->CloseAll();
+		return;
+	}
+
 	client->m_send_lock.lock();
 
 	while (!client->m_send_buf.empty())
@@ -181,4 +224,11 @@ void RJTcpClient::DeleteWriteReq(uv_write_t * write)
 	write_req_t* req = (write_req_t*)write;
 	delete req->buf.base;
 	delete req;
+}
+
+void RJTcpClient::WalkCallBack(uv_handle_t* handle, void* arg)
+{
+	if (!uv_is_closing(handle)) {
+		uv_close(handle, nullptr);
+	}
 }

@@ -31,6 +31,7 @@ void OnClientCallBack(int clientId, int type, const char* msg, int size)
 	}
 }
 
+///返回值小于0时，创建失败；否则创建成功，需主动调用ReleaseClient释放资源
 _EXTERN_C_ int _stdcall CreateClient(ClientCallBack callback)
 {
 	g_index += 1;
@@ -40,7 +41,12 @@ _EXTERN_C_ int _stdcall CreateClient(ClientCallBack callback)
 	client->client.m_callback = OnClientCallBack;
 	client->callback = callback;
 
-	client->client.Init();
+	int result = client->client.Connect();
+	if (result < 0)
+	{
+		delete client;
+		return result;
+	}
 
 	g_clients.insert(std::pair<int, RJClientStruct*>(clientId, client));
 	return clientId;

@@ -103,7 +103,12 @@ int main(int argc, char **argv) {
 	//getchar();
 
 	/*loop = uv_default_loop();
-	uv_tcp_t  socket;
+
+	uv_stop(loop);*/
+	//uv_stop(loop);
+	//uv_stop(loop);
+
+	/*uv_tcp_t  socket;
 	uv_tcp_init(loop, &socket);
 
 	uv_connect_t connect;
@@ -115,14 +120,14 @@ int main(int argc, char **argv) {
 		return 0;
 	}*/
 
-	std::cout << sizeof(RJTcpClient) <<std::endl;
+	//std::cout << sizeof(RJTcpClient) <<std::endl;
 
-	RJTcpClient client;
+	RJTcpClient* client = new RJTcpClient();
 
-	//std::thread thread(std::bind(&RJTcpClient::Init, &client));
+	////std::thread thread(std::bind(&RJTcpClient::Init, &client));
 
-	client.Init();
-	Sleep(1000);
+	client->Connect();
+	//Sleep(1000);
 
 	std::string test;
 
@@ -135,8 +140,14 @@ int main(int argc, char **argv) {
 	{
 		std::string s = std::to_string(i);
 		s.append(test);
-		client.Send(s.c_str(), s.size() + 1);
+		client->Send(s.c_str(), s.size() + 1);
 	}
+
+	Sleep(2000);
+
+	delete client;
+
+	getchar();
 
 	/*while (true)
 	{
@@ -151,9 +162,9 @@ int main(int argc, char **argv) {
 		Sleep(1000);
 	}*/
 
-	getchar();
+	//getchar();
 	//std::thread th(&RunTest);
 
-	uv_run(loop, UV_RUN_DEFAULT);
+	//uv_run(loop, UV_RUN_DEFAULT);
 	return 0;
 }

@@ -26,6 +26,8 @@ private:
 	uv_tcp_t m_uv_client;
 	uv_connect_t m_connect;
 	uv_async_t m_async_handle;
+	bool m_is_connected;
+	bool m_is_closing;
 
 	std::mutex m_send_lock;
 	std::queue<uv_buf_t> m_send_buf;
@@ -36,7 +38,7 @@ public:
 	RJClientCallBack m_callback;
 
 public:
-	_EXPORT_ void Init();
+	_EXPORT_ int Connect();
 	_EXPORT_ void Send(const char* msg, int size);
 	_EXPORT_ void Close();
 
@@ -45,6 +47,7 @@ private:
 	void OnMsg(uv_tcp_t* client, const char* msg, int size);
 	void OnError();
 	void RunThread();
+	void CloseAll();
 
 private:
 	static void AllocBuffer(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
@@ -53,5 +56,6 @@ private:
 	static void AsyncCallBack(uv_async_t* handle);
 	static void AfterSend(uv_write_t* req, int status);
 	static void DeleteWriteReq(uv_write_t* write);
+	static void WalkCallBack(uv_handle_t* handle, void* arg);
 };
 
