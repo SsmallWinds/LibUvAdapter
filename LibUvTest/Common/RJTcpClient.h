@@ -26,7 +26,6 @@ private:
 	uv_tcp_t m_uv_client;
 	uv_connect_t m_connect;
 	uv_async_t m_async_handle;
-	bool m_is_closing;
 
 	std::mutex m_send_lock;
 	std::queue<uv_buf_t> m_send_buf;
@@ -45,7 +44,6 @@ private:
 	void OnConnection();
 	void OnMsg(uv_tcp_t* client, const char* msg, int size);
 	void OnError();
-	void OnClosed();
 	void RunThread();
 
 private:

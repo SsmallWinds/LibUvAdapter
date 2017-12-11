@@ -5,7 +5,6 @@ using namespace std;
 
 RJTcpClient::RJTcpClient()
 {
-	m_is_closing = false;
 	m_reader.SetCallBack(std::bind(&RJTcpClient::OnMsg, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)
 		, &m_uv_client);
 }
@@ -41,7 +40,6 @@ void RJTcpClient::Send(const char* msg, int size)
 
 void RJTcpClient::Close()
 {
-	m_is_closing = true;
 	uv_async_send(&m_async_handle);
 }
 
@@ -66,10 +64,6 @@ void RJTcpClient::OnError()
 	if (m_callback != nullptr) {
 		m_callback(m_client_id, ON_ERROR, nullptr, 0);
 	}
-}
-
-void RJTcpClient::OnClosed()
-{
 }
 
 void RJTcpClient::RunThread()

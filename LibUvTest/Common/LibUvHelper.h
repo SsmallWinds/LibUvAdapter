@@ -37,7 +37,6 @@ inline void Msg2Package(const char* msg, int size, char* buf)
 {
 	PACKAGE_HEAD head;
 	head.size = size;
-	int sss = PACKAGE_HEAD_SIZE;
 	memcpy(buf, &head, PACKAGE_HEAD_SIZE);
 	memcpy(buf + PACKAGE_HEAD_SIZE, msg, size);
 }
