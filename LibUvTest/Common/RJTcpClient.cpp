@@ -5,6 +5,7 @@ using namespace std;
 
 RJTcpClient::RJTcpClient()
 {
+	m_p_thread = nullptr;
 	m_is_connected = false;
 	m_is_closing = false;
 	m_loop = nullptr;
@@ -25,13 +26,15 @@ RJTcpClient::~RJTcpClient()
 	}
 	m_send_lock.unlock();
 
-	CloseAll();
+	Close();
 
 	if (m_p_thread)
 	{
 		m_p_thread->join();
 		delete m_p_thread;
 	}
+	if (m_loop)
+		uv_loop_close(m_loop);
 	std::cout << "release success!" << std::endl;
 }
 

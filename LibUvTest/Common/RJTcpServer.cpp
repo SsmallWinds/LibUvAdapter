@@ -2,11 +2,32 @@
 
 RJTcpServer::RJTcpServer()
 {
+	m_pLoop = nullptr;
+	m_p_thread = nullptr;
+	m_is_closing = false;
 }
 
 
 RJTcpServer::~RJTcpServer()
 {
+	Close();
+
+	if (m_p_thread)
+	{
+		m_p_thread->join();
+		delete m_p_thread;
+	}
+
+	if (m_pLoop)
+		uv_loop_close(m_pLoop);
+
+	m_clients_lock.lock();
+	for (auto i = m_clients.begin(); i != m_clients.end(); i++)
+	{
+		delete *i;
+	}
+	m_clients_lock.unlock();
+	std::cout << "server release success!" << std::endl;
 }
 
 //msg指向的内存直接拷贝到new出的内存中，msg由发送者自己维护
@@ -49,6 +70,8 @@ void RJTcpServer::OnNewConnection(uv_tcp_t* client)
 {
 	std::cout << "OnNewConnection:" << client << std::endl;
 }
+
+
 
 void RJTcpServer::RemoveClient(uv_tcp_t * client)
 {
@@ -156,22 +179,78 @@ void RJTcpServer::AcceptConnection(uv_stream_t* server, int status)
 	rj_server->OnNewConnection(&client->client);
 }
 
-
-
-void RJTcpServer::Init()
+void RJTcpServer::AsyncCallBack(uv_async_t * handle)
 {
+	RJTcpServer* server = (RJTcpServer*)handle->data;
+	if (server->m_pLoop)
+		uv_walk(server->m_pLoop, WalkCallBack, server);
+}
+
+void RJTcpServer::WalkCallBack(uv_handle_t* handle, void* arg)
+{
+	if (!uv_is_closing(handle)) {
+		uv_close(handle, nullptr);
+	}
+}
+
+
+
+///关闭所有监听器，包括监听的所有TcpClient
+void RJTcpServer::Close()
+{
+	if (m_is_closing)
+		return;
+
+	m_is_closing = true;
+
+	if (m_pLoop)
+		uv_walk(m_pLoop, WalkCallBack, this);
+}
+
+int RJTcpServer::Init()
+{
+	int iret;
 	sockaddr_in addr;
 	m_pLoop = uv_default_loop();
-	m_server.data = this;
-	uv_tcp_init(m_pLoop, &m_server);
-	uv_ip4_addr(DEFAULT_IP, DEFAULT_PORT, &addr);
-	uv_tcp_bind(&m_server, (const sockaddr*)&addr, 0);
 
-	int iret = uv_listen((uv_stream_t*)&m_server, BACK_LOG, AcceptConnection);
+	m_async_handle.data = this;
+	iret = uv_async_init(m_pLoop, &m_async_handle, AsyncCallBack);
+	if (iret)
+	{
+		cout << "Init -> uv_async_init:" << GetUVError(iret) << endl;
+		return -1;
+	}
+	m_server.data = this;
+	iret = uv_tcp_init(m_pLoop, &m_server);
 	if (iret)
 	{
 		cout << "Init->uv_listen:" << GetUVError(iret) << endl;
+		return -1;
+	}
+	iret = uv_ip4_addr(DEFAULT_IP, DEFAULT_PORT, &addr);
+	if (iret)
+	{
+		cout << "Init->uv_listen:" << GetUVError(iret) << endl;
+		return -2;
+	}
+	iret = uv_tcp_bind(&m_server, (const sockaddr*)&addr, 0);
+	if (iret)
+	{
+		cout << "Init->uv_listen:" << GetUVError(iret) << endl;
+		return -3;
+	}
+	iret = uv_listen((uv_stream_t*)&m_server, BACK_LOG, AcceptConnection);
+	if (iret)
+	{
+		cout << "Init->uv_listen:" << GetUVError(iret) << endl;
+		return -4;
 	}
 
+	m_p_thread = new thread(&RJTcpServer::RunThread, this);
+	return 0;
+}
+
+void RJTcpServer::RunThread()
+{
 	uv_run(m_pLoop, UV_RUN_DEFAULT);
 }
