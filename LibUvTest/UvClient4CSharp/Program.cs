@@ -12,15 +12,13 @@ namespace UvClient4CSharp
         static void Main(string[] args)
         {
             LibUvClient client = new LibUvClient();
-            client.Init();
+            client.Init("127.0.0.1",7000);
 
             Thread.Sleep(1000);
 
             client.Send("Hello");
 
             Thread.Sleep(1000);
-
-           client.Release();
 
             Console.ReadLine();
         }

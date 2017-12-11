@@ -7,6 +7,7 @@
 #include <iostream>
 #include "RJTcpServer.h"
 #include <Windows.h>
+#include "SearchRequest.pb.h"
 
 
 using namespace std;
@@ -213,6 +214,27 @@ int main()
 
 	RJTcpServer server;
 	server.Init(7000);
+
+	Sleep(5000);
+
+
+
+	SearchRequest req;
+
+	req.set_query("test_query");
+	req.set_page_number(2);
+	req.set_result_per_page(3);
+	req.set_corpus(::Corpus::NEWS);
+
+	int lenth = req.ByteSize();
+	char* buf = new char[lenth];
+
+
+	req.SerializePartialToArray(buf, lenth);
+
+	server.Broadcast(buf, lenth);
+
+	delete[] buf;
 	getchar();
 	return 0;
 }
