@@ -2,6 +2,7 @@
 
 RJTcpServer::RJTcpServer()
 {
+	m_callback = nullptr;
 	m_pLoop = nullptr;
 	m_p_thread = nullptr;
 	m_is_closing = false;
@@ -71,16 +72,22 @@ void RJTcpServer::OnMsg(uv_tcp_t* client, const char* msg, int size)
 {
 	std::cout << "Client-" << client << ':' << msg << std::endl;
 	std::cout << msg + 16 << std::endl;
+	if (m_callback)
+		m_callback->OnMsg(client, msg, size);
 }
 
 void RJTcpServer::OnNewConnection(uv_tcp_t* client)
 {
 	std::cout << "OnNewConnection:" << client << std::endl;
+	if (m_callback)
+		m_callback->OnNewConnection(client);
 }
 
 void RJTcpServer::OnDisconnection(uv_tcp_t* client)
 {
 	std::cout << "OnDisconnection:" << client << std::endl;
+	if (m_callback)
+		m_callback->OnDisconnection(client);
 }
 
 

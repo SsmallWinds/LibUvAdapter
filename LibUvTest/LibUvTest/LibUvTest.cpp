@@ -201,7 +201,57 @@ void Test()
 		delete buf;
 		cout << "After ..." << endl;
 	}
-}
+};
+
+class Server :IRJTcpServerCallBack
+{
+public:
+	 Server()
+	{
+		m_server = new RJTcpServer();
+		m_server->m_callback = this;
+		int result = m_server->Init(7000);
+		if (result)
+		{
+			cout << "server creat error:" << result << endl;
+		}
+	};
+
+	 ~Server()
+	{
+		delete m_server;
+	};
+
+public:
+	RJTcpServer* m_server;
+
+	void OnMsg(uv_tcp_t* client, const char* msg, int size)
+	{
+
+	};
+	void OnNewConnection(uv_tcp_t* client)
+	{
+		SearchRequest req;
+
+		req.set_query("test_query");
+		req.set_page_number(2);
+		req.set_result_per_page(3);
+		req.set_corpus(::Corpus::NEWS);
+
+		int lenth = req.ByteSize();
+		char* buf = new char[16 + lenth];
+
+		memcpy(buf, "testtest", 16);
+
+		req.SerializePartialToArray(buf + 16, lenth);
+		m_server->Send(client, buf, 16 + lenth);
+
+	};
+	void OnDisconnection(uv_tcp_t* client)
+	{
+
+	};
+};
 
 int main()
 {
@@ -214,7 +264,7 @@ int main()
 
 	//printf("getchar\n");
 
-	RJTcpServer server;
+	/*RJTcpServer server;
 	server.Init(7000);
 
 	Sleep(5000);
@@ -239,7 +289,9 @@ int main()
 
 	server.Broadcast(buf, 16 + lenth);
 
-	delete[] buf;
+	delete[] buf;*/
+
+	Server server;
 	getchar();
 	return 0;
 }

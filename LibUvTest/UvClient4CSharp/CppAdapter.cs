@@ -14,7 +14,7 @@ namespace UvClient4CSharp
     {
         public delegate void QuoteCallBackDelegate(int clientId, int type, IntPtr msg, int size);
 
-        public const string DllPath = "Common.dll";
+        public const string DllPath = "LibUvClient.dll";
 
         [DllImport(DllPath, EntryPoint = "CreateClient", CallingConvention = CallingConvention.StdCall)]
         public extern static int CreateClient(ref byte ip, int port, QuoteCallBackDelegate call);

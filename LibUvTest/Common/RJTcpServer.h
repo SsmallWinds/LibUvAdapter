@@ -12,6 +12,15 @@ using namespace std;
 #define DEFAULT_IP "0.0.0.0"
 #define BACK_LOG 128
 
+class IRJTcpServerCallBack
+{
+public:
+	virtual ~IRJTcpServerCallBack() {};
+	virtual void OnMsg(uv_tcp_t* client, const char* msg, int size) = 0;
+	virtual void OnNewConnection(uv_tcp_t* client) = 0;
+	virtual void OnDisconnection(uv_tcp_t* client) = 0;
+};
+
 typedef struct
 {
 	uv_tcp_t client;
@@ -38,9 +47,11 @@ private:
 	uv_tcp_t m_server;
 	uv_async_t m_async_handle;
 	thread* m_p_thread;
-
 	std::queue<uv_tcp_send_buf> m_send_buf;
 	mutex m_send_buf_lock;
+
+public:
+	IRJTcpServerCallBack* m_callback;
 
 public:
 	_EXPORT_ void Close();
