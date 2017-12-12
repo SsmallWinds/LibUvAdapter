@@ -10,6 +10,14 @@ RJTcpServer::RJTcpServer()
 
 RJTcpServer::~RJTcpServer()
 {
+	m_send_buf_lock.lock();
+	while (!m_send_buf.empty())
+	{
+		delete m_send_buf.front().buf.base;
+		m_send_buf.pop();
+	}
+	m_send_buf_lock.unlock();
+
 	Close();
 
 	if (m_p_thread)
@@ -33,22 +41,20 @@ RJTcpServer::~RJTcpServer()
 //msg指向的内存直接拷贝到new出的内存中，msg由发送者自己维护
 void RJTcpServer::Send(uv_tcp_t* client, const char* msg, int size)
 {
-	write_req_t *req = new write_req_t();
-	req->req.data = client;
+	if (client == nullptr || msg == nullptr || size <= 0)return;
 
 	char* buf = new char[size + PACKAGE_HEAD_SIZE];
 	Msg2Package(msg, size, buf);
 
-	req->buf = uv_buf_init(buf, size + PACKAGE_HEAD_SIZE);
-	int iret;
-	iret = uv_write(&req->req, (uv_stream_t*)client, &req->buf, 1, AfterSend);
-	if (iret)
-	{
-		cout << "AcceptConnection->uv_read_start:" << GetUVError(iret) << endl;
-		uv_close((uv_handle_t*)client, ClientClose);
-		RemoveClient(client);
-		DeleteWriteReq((uv_write_t*)req);
-	}
+	uv_tcp_send_buf uv_buf;
+	uv_buf.buf.base = buf;
+	uv_buf.buf.len = size + PACKAGE_HEAD_SIZE;
+	uv_buf.client = client;
+
+	m_send_buf_lock.lock();
+	m_send_buf.push(uv_buf);
+	m_send_buf_lock.unlock();
+	uv_async_send(&m_async_handle);
 }
 
 void RJTcpServer::Broadcast(const char * msg, int size)
@@ -64,6 +70,7 @@ void RJTcpServer::Broadcast(const char * msg, int size)
 void RJTcpServer::OnMsg(uv_tcp_t* client, const char* msg, int size)
 {
 	std::cout << "Client-" << client << ':' << msg << std::endl;
+	std::cout << msg + 16 << std::endl;
 }
 
 void RJTcpServer::OnNewConnection(uv_tcp_t* client)
@@ -71,11 +78,15 @@ void RJTcpServer::OnNewConnection(uv_tcp_t* client)
 	std::cout << "OnNewConnection:" << client << std::endl;
 }
 
-
-
-void RJTcpServer::RemoveClient(uv_tcp_t * client)
+void RJTcpServer::OnDisconnection(uv_tcp_t* client)
 {
-	m_clients_lock.lock();
+	std::cout << "OnDisconnection:" << client << std::endl;
+}
+
+
+void RJTcpServer::RemoveClient(uv_tcp_t* client)
+{
+	std::lock_guard<std::mutex>lock(m_clients_lock);
 	for (auto i = m_clients.begin(); i != m_clients.end(); i++)
 	{
 		if (&(*i)->client == client)
@@ -84,7 +95,20 @@ void RJTcpServer::RemoveClient(uv_tcp_t * client)
 			break;
 		}
 	}
-	m_clients_lock.unlock();
+	OnDisconnection(client);
+}
+
+bool RJTcpServer::CheckClient(uv_tcp_t * client)
+{
+	std::lock_guard<std::mutex>lock(m_clients_lock);
+	for (auto i = m_clients.begin(); i != m_clients.end(); i++)
+	{
+		if (&(*i)->client == client)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 void RJTcpServer::DeleteWriteReq(uv_write_t * write)
@@ -121,8 +145,8 @@ void RJTcpServer::HandleMsg(uv_stream_t* client, ssize_t nread, const uv_buf_t* 
 	else
 	{
 		cout << "HandleMsg:" << GetUVError(nread) << endl;
-		uv_close((uv_handle_t*)client, ClientClose);
 		((RJTcpServer*)client->data)->RemoveClient((uv_tcp_t*)client);
+		uv_close((uv_handle_t*)client, ClientClose);
 	}
 
 	free(buf->base);
@@ -182,8 +206,41 @@ void RJTcpServer::AcceptConnection(uv_stream_t* server, int status)
 void RJTcpServer::AsyncCallBack(uv_async_t * handle)
 {
 	RJTcpServer* server = (RJTcpServer*)handle->data;
-	if (server->m_pLoop)
+
+	//遍历当前的连接并关闭
+	if (server->m_is_closing)
+	{
 		uv_walk(server->m_pLoop, WalkCallBack, server);
+		return;
+	}
+
+	server->m_send_buf_lock.lock();
+
+	while (!server->m_send_buf.empty())
+	{
+		uv_tcp_send_buf& buf = server->m_send_buf.front();
+
+		if (!server->CheckClient(buf.client))
+		{
+			delete buf.buf.base;
+		}
+		else
+		{
+			write_req_t *req = new write_req_t();
+			req->buf = uv_buf_init(buf.buf.base, buf.buf.len);
+			int iret;
+			iret = uv_write(&req->req, (uv_stream_t*)buf.client, &req->buf, 1, AfterSend);
+			if (iret)
+			{
+				cout << "AsyncCallBack->uv_write:" << GetUVError(iret) << endl;
+				server->RemoveClient(buf.client);
+				uv_close((uv_handle_t*)buf.client, ClientClose);
+				DeleteWriteReq((uv_write_t*)req);
+			}
+		}
+		server->m_send_buf.pop();
+	}
+	server->m_send_buf_lock.unlock();
 }
 
 void RJTcpServer::WalkCallBack(uv_handle_t* handle, void* arg)
@@ -192,8 +249,6 @@ void RJTcpServer::WalkCallBack(uv_handle_t* handle, void* arg)
 		uv_close(handle, nullptr);
 	}
 }
-
-
 
 ///关闭所有监听器，包括监听的所有TcpClient
 void RJTcpServer::Close()
@@ -204,7 +259,9 @@ void RJTcpServer::Close()
 	m_is_closing = true;
 
 	if (m_pLoop)
-		uv_walk(m_pLoop, WalkCallBack, this);
+	{
+		uv_async_send(&m_async_handle);
+	}
 }
 
 int RJTcpServer::Init(int port)
@@ -225,25 +282,25 @@ int RJTcpServer::Init(int port)
 	if (iret)
 	{
 		cout << "Init->uv_listen:" << GetUVError(iret) << endl;
-		return -1;
+		return -2;
 	}
 	iret = uv_ip4_addr(DEFAULT_IP, port, &addr);
 	if (iret)
 	{
 		cout << "Init->uv_listen:" << GetUVError(iret) << endl;
-		return -2;
+		return -3;
 	}
 	iret = uv_tcp_bind(&m_server, (const sockaddr*)&addr, 0);
 	if (iret)
 	{
 		cout << "Init->uv_listen:" << GetUVError(iret) << endl;
-		return -3;
+		return -4;
 	}
 	iret = uv_listen((uv_stream_t*)&m_server, BACK_LOG, AcceptConnection);
 	if (iret)
 	{
 		cout << "Init->uv_listen:" << GetUVError(iret) << endl;
-		return -4;
+		return -5;
 	}
 
 	m_p_thread = new thread(&RJTcpServer::RunThread, this);

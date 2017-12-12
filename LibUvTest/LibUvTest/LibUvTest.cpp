@@ -1,6 +1,8 @@
 // LibUvTest.cpp : 定义控制台应用程序的入口点。
 //
 
+
+
 #include "stdafx.h"
 #include "uv.h"
 #include <thread>
@@ -227,12 +229,15 @@ int main()
 	req.set_corpus(::Corpus::NEWS);
 
 	int lenth = req.ByteSize();
-	char* buf = new char[lenth];
+	char* buf = new char[16 + lenth];
 
+	memcpy(buf, "testtest", 16);
 
-	req.SerializePartialToArray(buf, lenth);
+	req.SerializePartialToArray(buf + 16, lenth);
 
-	server.Broadcast(buf, lenth);
+	std::cout << 16 + lenth << endl;
+
+	server.Broadcast(buf, 16 + lenth);
 
 	delete[] buf;
 	getchar();

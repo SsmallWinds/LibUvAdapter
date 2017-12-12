@@ -12,7 +12,7 @@ namespace UvClient4CSharp
     public interface IUvClientCallBack
     {
         void OnConnection();
-        void OnMsg(IntPtr msg);
+        void OnMsg(byte[] msg);
         void OnError();
     }
 
@@ -34,11 +34,10 @@ namespace UvClient4CSharp
             _callBack = callBack;
         }
 
-        public void Send(string msg)
+        public void Send(byte[] msg)
         {
             if (_clientId < 0) return;
-            byte[] bmsg = System.Text.Encoding.UTF8.GetBytes(msg);
-            CppAdapter.SendMsg(_clientId, ref bmsg[0], msg.Length);
+            CppAdapter.SendMsg(_clientId, ref msg[0], msg.Length);
         }
 
         public void Release()
@@ -60,9 +59,7 @@ namespace UvClient4CSharp
             {
                 byte[] buf = new byte[size];
                 Marshal.Copy(msg, buf, 0, size);
-
-                var reqResult = SearchRequest.Parser.ParseFrom(buf);
-                _callBack?.OnMsg(msg);
+                _callBack?.OnMsg(buf);
             }
             else if (msgType == MsgType.ON_ERROR)
             {

@@ -4,6 +4,7 @@
 #include <vector>
 #include <mutex>
 #include <thread>
+#include <queue>
 #include "LibUvHelper.h"
 
 using namespace std;
@@ -16,6 +17,12 @@ typedef struct
 	uv_tcp_t client;
 	BufferReader reader;
 }uv_tcp_client;
+
+typedef struct
+{
+	uv_tcp_t* client;
+	uv_buf_t buf;
+}uv_tcp_send_buf;
 
 class RJTcpServer
 {
@@ -32,6 +39,9 @@ private:
 	uv_async_t m_async_handle;
 	thread* m_p_thread;
 
+	std::queue<uv_tcp_send_buf> m_send_buf;
+	mutex m_send_buf_lock;
+
 public:
 	_EXPORT_ void Close();
 	_EXPORT_ int Init(int port);
@@ -41,11 +51,13 @@ public:
 private:
 	void OnMsg(uv_tcp_t* client, const char* msg, int size);
 	void OnNewConnection(uv_tcp_t* client);
+	void OnDisconnection(uv_tcp_t* client);
 
 
 private:
 	void RunThread();
 	void RemoveClient(uv_tcp_t* client);
+	bool CheckClient(uv_tcp_t* client);
 	static void DeleteWriteReq(uv_write_t* write);
 	static void AfterSend(uv_write_t* req, int status);
 	static void AllocBuffer(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
