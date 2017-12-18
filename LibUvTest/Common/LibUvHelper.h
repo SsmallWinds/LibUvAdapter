@@ -8,6 +8,14 @@
 #include <iostream>
 #include <functional>
 
+#ifdef WIN32
+#include<Winsock2.h>
+#pragma comment(lib,"Ws2_32.lib")
+#else
+#include <arpa/inet.h>
+#endif // WIN32
+
+
 #define _EXPORT_ _declspec(dllexport)
 
 #define ON_CONNECTION 0
@@ -26,17 +34,18 @@ typedef struct
 #pragma pack(push,1)//将当前字节对齐值设为1
 typedef struct
 {
-	unsigned char proto_type = 'a';
+	unsigned char proto_type[2] = { 'u','v' };
 	uint32_t size;
 }PACKAGE_HEAD;
 #pragma pack(pop)
 
 #define PACKAGE_HEAD_SIZE sizeof(PACKAGE_HEAD)
 
+//
 inline void Msg2Package(const char* msg, int size, char* buf)
 {
 	PACKAGE_HEAD head;
-	head.size = size;
+	head.size = htonl(size);//local 2 net
 	memcpy(buf, &head, PACKAGE_HEAD_SIZE);
 	memcpy(buf + PACKAGE_HEAD_SIZE, msg, size);
 }
@@ -109,7 +118,14 @@ public:
 		m_index += size;
 		while (m_index >= PACKAGE_HEAD_SIZE)
 		{
-			memcpy(&m_current_msg_size, m_msg_buffer + 1, sizeof(int));
+			int msg_size;
+			memcpy(&msg_size, m_msg_buffer + 2, sizeof(int));//指针前两个字节是认证码
+			m_current_msg_size = ntohl(msg_size); //net2local
+
+			if (m_msg_buffer[0] != 'u' || m_msg_buffer[1] != 'v')
+			{
+				std::cout << "UNPACKAGE ERROR!!" << std::endl; ///TODO error dispose
+			}
 
 			if (m_index >= PACKAGE_HEAD_SIZE + m_current_msg_size)
 			{
